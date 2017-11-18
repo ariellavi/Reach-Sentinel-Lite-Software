@@ -5,12 +5,14 @@
 #include <Adafruit_HMC5883_U.h>
 #include <Adafruit_MPL3115A2.h>
 #include <Adafruit_L3GD20_U.h>
+#include "Adafruit_MCP9808.h"
 
 /* Note: Since the sensors are declared globally, the respective sensor functions assume their successful declaration here */
 /* Must assign a unique ID to each sensor: */
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345); // Magnetometer
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12346); // Accelerometer
 Adafruit_L3GD20_Unified gyro = Adafruit_L3GD20_Unified(12347); // Gyroscope
+Adafruit_MCP9808 tempsensor = Adafruit_MCP9808(); // Temperature Sensor
 
 /*  Barometer Instructions:
  *  Power by connecting Vin to 3-5V, GND to GND
@@ -54,6 +56,14 @@ void setup() {
   } else {
     Serial.println("The following sensor has been initialised: BAROMETER");
     // ~displaySensorDetails(&baro);~ Display details functionality not enabled by Adafruit.
+  }
+
+  if (!tempsensor.begin()) {
+    Serial.println("Couldn't find MCP9808!");
+    while (1);
+  } else {
+    Serial.println("The following sensor has been initialised: MPCP9808");
+    // ~displaySensorDetails(&tempsensor);~ Display details functionality not enabled by Adafruit.
   }
 
   // Initialising Gyroscope
@@ -102,6 +112,19 @@ void getAccelerometerData() {
   Serial.print("X: "); Serial.print(event.acceleration.x); Serial.print("  ");
   Serial.print("Y: "); Serial.print(event.acceleration.y); Serial.print("  ");
   Serial.print("Z: "); Serial.print(event.acceleration.z); Serial.print("  ");Serial.println("m/s^2 ");
+  Serial.println("------------------------------------");
+  Serial.println("------------------------------------");
+}
+
+void getTemperatureData() {
+  // Read and print out the temperature, then convert to *F
+  float c = tempsensor.readTempC();
+  float f = c * 9.0 / 5.0 + 32;
+  Serial.println("------------------------------------");
+  Serial.println("TEMPERATURE:");
+  Serial.println("------------------------------------");
+  Serial.print("Temp: "); Serial.print(c); Serial.print("*C\t"); 
+  Serial.print(f); Serial.println("*F");
   Serial.println("------------------------------------");
   Serial.println("------------------------------------");
 }
