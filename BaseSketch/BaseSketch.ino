@@ -23,6 +23,8 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808(); // Temperature Sensor
 */
 Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 
+bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false;
+
 struct datapacket {
   float accel_x;
   float accel_y;
@@ -46,20 +48,20 @@ void setup() {
   if(!mag.begin()) {
     /* There was a problem detecting the HMC5883 ... check your connections */
     Serial.println("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!");
-    while(1);
   } else {
     Serial.println("The following sensor has been initialised:");
     displaySensorDetails(&mag);
+    MAG_FLAG = true;
   }
 
   // Initialising Accelerometer
   if(!accel.begin()) {
     /* There was a problem detecting the ADXL345 ... check your connections */
     Serial.println("Ooops, no ADXL345 (Accelerometer) detected ... Check your wiring!");
-    while(1);
   } else {
     Serial.println("The following sensor has been initialised:");
     displaySensorDetails(&accel);
+    ACC_FLAG = true;
   }
   // TODO: Setting range for accelerometer. Choose from 16,8,4,2 Gs.
   accel.setRange(ADXL345_RANGE_16_G);
@@ -68,18 +70,18 @@ void setup() {
   if(!baro.begin()) {
     /* There was a problem detecting the MPL3115A2 ... check your connections */
     Serial.println("Ooops, no MPL3115A2 (Barometer) detected ... Check your wiring!");
-    while(1);
   } else {
     Serial.println("The following sensor has been initialised: BAROMETER");
     // ~displaySensorDetails(&baro);~ Display details functionality not enabled by Adafruit.
+    BARO_FLAG = true;
   }
 
   if (!tempsensor.begin()) {
     Serial.println("Couldn't find MCP9808!");
-    while (1);
   } else {
     Serial.println("The following sensor has been initialised: MPCP9808");
     // ~displaySensorDetails(&tempsensor);~ Display details functionality not enabled by Adafruit.
+    TEMP_FLAG = true;
   }
 
   // Initialising Gyroscope
@@ -89,10 +91,10 @@ void setup() {
   {
     /* There was a problem detecting the L3GD20 ... check your connections */
     Serial.println("Ooops, no L3GD20 (Gyroscope) detected ... Check your wiring!");
-    while(1);
   } else {
     Serial.println("The following sensor has been initialised:");
     displaySensorDetails(&gyro);
+    GYRO_FLAG = true;
   }
 }
 
