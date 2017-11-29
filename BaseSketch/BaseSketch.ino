@@ -33,11 +33,13 @@ struct datapacket {
   float gyro_y;
   float gyro_z;
   float mag_x;
-  float max_y;
+  float mag_y;
   float mag_z;
+  float mag_heading;
   float temp_tempF; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
-  float baro_pascals;
-  float baro_altitude;
+  float temp_tempC; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
+  float baro_pressure; // in mmHg
+  float baro_altitude; // in meters
   float baro_tempC;
 };
 
@@ -100,7 +102,18 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  datapacket* currentPacket = new datapacket;
+  populateDataPacket(currentPacket);
+  printDataPacket(currentPacket);
+  delay(500);
+}
 
+void populateDataPacket(struct datapacket* packet) {
+  getAccelerometerData(packet);
+  getTemperatureData(packet);
+  getBarometerData(packet);
+  getGyroscopeData(packet);
+  getMagnetometerReading(packet);
 }
 
 // Takes a pointer to the sensor object as a parameter and displays the details.
@@ -120,66 +133,39 @@ void displaySensorDetails(Adafruit_Sensor* currentSensor) {
 }
 
 // TODO: Currently prints X, Y, Z acceleration. Return format TBD.
-void getAccelerometerData() {
+void getAccelerometerData(struct datapacket* packet) {
   sensors_event_t event; 
   accel.getEvent(&event);
-  Serial.println("------------------------------------");
-  Serial.println("ACCELEROMETER:");
-  Serial.println("------------------------------------");
-  /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print("X: "); Serial.print(event.acceleration.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.acceleration.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.acceleration.z); Serial.print("  ");Serial.println("m/s^2 ");
-  Serial.println("------------------------------------");
-  Serial.println("------------------------------------");
+  /* Populate the datapacket with the results (acceleration is measured in m/s^2) */
+  packet->accel_x = event.acceleration.x;
+  packet->accel_y = event.acceleration.y;
+  packet->accel_z = event.acceleration.z;
 }
 
-void getTemperatureData() {
-  // Read and print out the temperature, then convert to *F
+void getTemperatureData(struct datapacket* packet) {
+  // Read and populate datapacket with the temperature, then convert to *F
   float c = tempsensor.readTempC();
   float f = c * 9.0 / 5.0 + 32;
-  Serial.println("------------------------------------");
-  Serial.println("TEMPERATURE:");
-  Serial.println("------------------------------------");
-  Serial.print("Temp: "); Serial.print(c); Serial.print("*C\t"); 
-  Serial.print(f); Serial.println("*F");
-  Serial.println("------------------------------------");
-  Serial.println("------------------------------------");
+  packet->temp_tempC = c;
+  packet->temp_tempF = f;
 }
 
-void getBarometerData() {
-  Serial.println("------------------------------------");
-  Serial.println("BAROMETER:");
-  Serial.println("------------------------------------");
-  float pascals = baro.getPressure();
+void getBarometerData(struct datapacket* packet) {
   // Our weather page presents pressure in Inches (Hg)
   // Use http://www.onlineconversion.com/pressure.htm for other units
-  Serial.print(pascals/3377); Serial.println(" Inches (Hg)");
-
-  float altm = baro.getAltitude();
-  Serial.print(altm); Serial.println(" meters");
-
-  float tempC = baro.getTemperature();
-  Serial.print(tempC); Serial.println("*C");
-  Serial.println("------------------------------------");
-  Serial.println("------------------------------------");
+  packet->baro_pressure = baro.getPressure()/3377; // NOTE: in mmHG!!
+  packet->baro_altitude = baro.getAltitude();
+  packet->baro_tempC = baro.getTemperature();
 }
 
-void getGyroscopeData() {
+void getGyroscopeData(struct datapacket* packet) {
   sensors_event_t event; 
   gyro.getEvent(&event);
 
-  Serial.println("------------------------------------");
-  Serial.println("GYROSCOPE:");
-  Serial.println("------------------------------------");
-  /* Display the results (speed is measured in rad/s) */
-  Serial.print("X: "); Serial.print(event.gyro.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.gyro.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.gyro.z); Serial.print("  ");
-  Serial.println("rad/s ");
-  Serial.println("------------------------------------");
-  Serial.println("------------------------------------");
-  delay(500);
+  /* Populate datapacket with the results (speed is measured in rad/s) */
+  packet->gyro_x = event.gyro.x;
+  packet->gyro_x = event.gyro.x;
+  packet->gyro_x = event.gyro.x;
 }
 
 
@@ -190,17 +176,14 @@ void getGyroscopeData() {
 */
 // TODO: Figure out what we want returned from a Magnetometer read - {x, y, z} OR {heading} OR both?
 // TODO: For now, functions just print to serial, will see what we want to do with data once we have a better understanding of things.
-void getMagnetometerReading() {
+void getMagnetometerReading(struct datapacket* packet) {
   sensors_event_t event; 
   mag.getEvent(&event);
 
-  Serial.println("------------------------------------");
-  Serial.println("MAGNETOMETER:");
-  Serial.println("------------------------------------");
-  /* Display the results (magnetic vector values are in micro-Tesla (uT)) */
-  Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print("  ");Serial.println("uT");
+  /* Populate datapacket with the results (magnetic vector values are in micro-Tesla (uT)) */
+  packet->mag_x = event.magnetic.x;
+  packet->mag_y = event.magnetic.y;
+  packet->mag_z = event.magnetic.z;
 
   // Hold the module so that Z is pointing 'up' and you can measure the heading with x&y
   // Calculate heading when the magnetometer is level, then correct for signs of axis.
@@ -224,9 +207,81 @@ void getMagnetometerReading() {
   // Convert radians to degrees for readability.
   float headingDegrees = heading * 180/M_PI; 
   
-  Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
-  // TODO: Delay at the end of the reading? Any significance?
+  packet->mag_heading = headingDegrees;
+}
+
+void printDataPacket(struct datapacket* packet) {
+  
   Serial.println("------------------------------------");
+  Serial.println("---------!!START OF PACKET!!--------");
+  Serial.println("------------------------------------\n");
+
+  // Print Accelerometer Data
+  Serial.println("------------------------------------");
+  Serial.println("ACCELEROMETER:");
+  Serial.println("------------------------------------");
+  if (ACC_FLAG) {
+    /* Display the results (acceleration is measured in m/s^2) */
+    Serial.print("X: "); Serial.print(packet->accel_x); Serial.print("  ");
+    Serial.print("Y: "); Serial.print(packet->accel_y); Serial.print("  ");
+    Serial.print("Z: "); Serial.print(packet->accel_z); Serial.print("  ");Serial.println("m/s^2 ");
+  } else {
+    Serial.print("NO ACCELEROMETER CONNECTED!");
+  }
+  
+  // Print Gyroscope Data
+  Serial.println("------------------------------------");
+  Serial.println("GYROSCOPE:");
+  Serial.println("------------------------------------");
+  if (GYRO_FLAG) {
+    /* Display the results (acceleration is measured in m/s^2) */
+    Serial.print("X: "); Serial.print(packet->gyro_x); Serial.print("  ");
+    Serial.print("Y: "); Serial.print(packet->gyro_y); Serial.print("  ");
+    Serial.print("Z: "); Serial.print(packet->gyro_z); Serial.print("  ");Serial.println("rad/s ");
+  } else {
+    Serial.print("NO GYROSCOPE CONNECTED!");
+  }
+
+  // Print Magnetometer Data
+  Serial.println("------------------------------------");
+  Serial.println("MAGNETOMETER:");
+  Serial.println("------------------------------------");
+  if (MAG_FLAG) {
+    /* Display the results (acceleration is measured in m/s^2) */
+    Serial.print("X: "); Serial.print(packet->mag_x); Serial.print("  ");
+    Serial.print("Y: "); Serial.print(packet->mag_y); Serial.print("  ");
+    Serial.print("Z: "); Serial.print(packet->mag_z); Serial.print("  ");Serial.println("m/s^2 ");
+    Serial.print("Heading (degrees): "); Serial.println(packet->mag_heading);
+  } else {
+    Serial.print("NO MAGNETOMETER CONNECTED!");
+  }
+
+  // Print Temperature data
+  Serial.println("------------------------------------");
+  Serial.println("TEMPERATURE:");
+  Serial.println("------------------------------------");
+  if (TEMP_FLAG) {
+    Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.print("*C\t"); 
+    Serial.print(packet->temp_tempF); Serial.println("*F");
+  } else {
+    Serial.print("NO TEMPERATURE SENSOR CONNECTED!");
+  }
+
+  // Print Barometer Data
+  Serial.println("------------------------------------");
+  Serial.println("BAROMETER:");
+  Serial.println("------------------------------------");
+  if (BARO_FLAG) {
+    Serial.print(packet->baro_pressure); Serial.println(" Inches (Hg)");
+    Serial.print(packet->baro_altitude); Serial.println(" meters");
+    Serial.print(packet->baro_tempC); Serial.println("*C");
+  } else {
+    Serial.print("NO BAROMETER CONNECTED!");
+  }
+
+
+  Serial.println("\n------------------------------------");
+  Serial.println("----------!!END OF PACKET!!---------");
   Serial.println("------------------------------------");
 }
 
