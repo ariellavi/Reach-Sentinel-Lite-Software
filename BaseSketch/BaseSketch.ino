@@ -105,6 +105,7 @@ void loop() {
   datapacket* currentPacket = new datapacket;
   populateDataPacket(currentPacket);
   printDataPacket(currentPacket);
+  delete currentPacket;
   delay(500);
 }
 
