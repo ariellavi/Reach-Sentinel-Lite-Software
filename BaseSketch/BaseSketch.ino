@@ -10,8 +10,6 @@
 #include <SPI.h>
 #include <RH_RF95.h>
 
-//#include <string>
-
 /* Note: Since the sensors are declared globally, the respective sensor functions assume their successful declaration here */
 /* Must assign a unique ID to each sensor: */
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345); // Magnetometer
@@ -77,14 +75,14 @@ void setup() {
   Serial.begin(9600);
 
   // Initialising Magnetometer
-  if(!mag.begin()) {
-    /* There was a problem detecting the HMC5883 ... check your connections */
-    Serial.println(F("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!"));
-  } else {
-    Serial.println(F("The following sensor has been initialised:"));
-    displaySensorDetails(&mag);
+  //if(!mag.begin()) {
+  //  /* There was a problem detecting the HMC5883 ... check your connections */
+  //  Serial.println(F("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!"));
+  //} else {
+  //  Serial.println(F("The following sensor has been initialised:"));
+  //  displaySensorDetails(&mag);
     //MAG_FLAG = true;
-  }
+  //}
 
   // Initialising Accelerometer
   if(!accel.begin()) {
@@ -113,21 +111,25 @@ void setup() {
   } else {
     Serial.println(F("The following sensor has been initialised: MPCP9808"));
     // ~displaySensorDetails(&tempsensor);~ Display details functionality not enabled by Adafruit.
-   TEMP_FLAG = true;
+    TEMP_FLAG = true;
   }
 
   // Initialising Gyroscope
+  Serial.println(F("Init gyro"));
 
-  if(!gyro.begin())
+  Wire.beginTransmission(0x6B); //Gyro address
+  if(Wire.endTransmission() == 0) {
+    GYRO_FLAG = true;
+  }
+  if(GYRO_FLAG && !gyro.begin())
   {
     /* There was a problem detecting the L3GD20 ... check your connections */
     Serial.println(F("Ooops, no L3GD20 (Gyroscope) detected ... Check your wiring!"));
   } else {
     Serial.println(F("The following sensor has been initialised:"));
     displaySensorDetails(&gyro);
-    gyro.enableAutoRange(true);
-    GYRO_FLAG = true;
-  }
+    gyro.enableAutoRange(true);   
+ }
   
 
   ///////
@@ -387,6 +389,9 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("---------!!START OF PACKET!!--------"));
   Serial.println(F("------------------------------------\n"));
 
+  // Print timestamp
+  Serial.print(F("Timestamp: ")); Serial.println(packet->timestamp);
+
   // Print Accelerometer Data
   Serial.println(F("------------------------------------"));
   Serial.println(F("ACCELEROMETER:"));
@@ -518,10 +523,13 @@ void loop() {
   printDataPacket(currentPacket);
 
   //Send data packet to radio
-  bool ret = send_packet(currentPacket);
-  if(!ret) {
-    Serial.println("Packet sending failed");
+  if(RADIO_FLAG) {
+    bool ret = send_packet(currentPacket);
+    if(!ret) {
+      Serial.println("Packet sending failed");
+    }
   }
+  
   
   delete currentPacket;
   delay(500);
