@@ -1,0 +1,11 @@
+Changelog
+
+Edward 2/26/2018
+- Added functions for sending to radio
+- Added comments to functions
+- Fixed bug where sensor is initialized/asked for data when not connected
+
+
+Currently known bugs
+- IMPORTANT: Threading not implemented, sensors have to wait til radio finishes sending data to continue 
+- MAG_FLAG is set when magnetometer is disconnected
