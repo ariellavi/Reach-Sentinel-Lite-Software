@@ -7,6 +7,9 @@
 #include <Adafruit_L3GD20_U.h>
 #include "Adafruit_MCP9808.h"
 
+#include <SPI.h>
+#include <RH_RF95.h>
+
 /* Note: Since the sensors are declared globally, the respective sensor functions assume their successful declaration here */
 /* Must assign a unique ID to each sensor: */
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345); // Magnetometer
@@ -23,9 +26,30 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808(); // Temperature Sensor
 */
 Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 
-bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false;
+bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false, RADIO_FLAG = false;
+
+float myNAN = sqrt(-1);
+
+//////////////////////
+/*Radio definitions */
+//////////////////////
+
+#define RFM95_CS 10
+#define RFM95_RST 9
+#define RFM95_INT 2
+
+// Change to 434.0 or other frequency, must match RX's freq!
+#define RF95_FREQ 431.3
+
+// Singleton instance of the radio driver
+RH_RF95 rf95(RFM95_CS, RFM95_INT);
+
+//////////////////////
+/*DATA PACKET FORMAT */
+//////////////////////
 
 struct datapacket {
+  unsigned long timestamp;
   float accel_x;
   float accel_y;
   float accel_z;
@@ -43,73 +67,143 @@ struct datapacket {
   float baro_tempC;
 };
 
+//////////////////////
+/*SETUP */
+//////////////////////
+
 void setup() {
   Serial.begin(9600);
 
   // Initialising Magnetometer
-  if(!mag.begin()) {
-    /* There was a problem detecting the HMC5883 ... check your connections */
-    Serial.println("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!");
-  } else {
-    Serial.println("The following sensor has been initialised:");
-    displaySensorDetails(&mag);
-    MAG_FLAG = true;
-  }
+  //if(!mag.begin()) {
+  //  /* There was a problem detecting the HMC5883 ... check your connections */
+  //  Serial.println(F("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!"));
+  //} else {
+  //  Serial.println(F("The following sensor has been initialised:"));
+  //  displaySensorDetails(&mag);
+    //MAG_FLAG = true;
+  //}
 
   // Initialising Accelerometer
   if(!accel.begin()) {
     /* There was a problem detecting the ADXL345 ... check your connections */
-    Serial.println("Ooops, no ADXL345 (Accelerometer) detected ... Check your wiring!");
+    Serial.println(F("Ooops, no ADXL345 (Accelerometer) detected ... Check your wiring!"));
   } else {
-    Serial.println("The following sensor has been initialised:");
+    Serial.println(F("The following sensor has been initialised:"));
     displaySensorDetails(&accel);
     ACC_FLAG = true;
   }
   // TODO: Setting range for accelerometer. Choose from 16,8,4,2 Gs.
-  accel.setRange(ADXL345_RANGE_16_G);
+  //accel.setRange(ADXL345_RANGE_16_G);
 
   // Initialising Barometer
   if(!baro.begin()) {
     /* There was a problem detecting the MPL3115A2 ... check your connections */
     Serial.println("Ooops, no MPL3115A2 (Barometer) detected ... Check your wiring!");
   } else {
-    Serial.println("The following sensor has been initialised: BAROMETER");
+    Serial.println(F("The following sensor has been initialised: BAROMETER"));
     // ~displaySensorDetails(&baro);~ Display details functionality not enabled by Adafruit.
     BARO_FLAG = true;
   }
 
   if (!tempsensor.begin()) {
-    Serial.println("Couldn't find MCP9808!");
+    Serial.println(F("Couldn't find MCP9808!"));
   } else {
-    Serial.println("The following sensor has been initialised: MPCP9808");
+    Serial.println(F("The following sensor has been initialised: MPCP9808"));
     // ~displaySensorDetails(&tempsensor);~ Display details functionality not enabled by Adafruit.
     TEMP_FLAG = true;
   }
 
   // Initialising Gyroscope
-  /* Enable auto-ranging */
-  gyro.enableAutoRange(true);
-  if(!gyro.begin())
-  {
-    /* There was a problem detecting the L3GD20 ... check your connections */
-    Serial.println("Ooops, no L3GD20 (Gyroscope) detected ... Check your wiring!");
-  } else {
-    Serial.println("The following sensor has been initialised:");
-    displaySensorDetails(&gyro);
+  Serial.println(F("Init gyro"));
+
+  Wire.beginTransmission(0x6B); //Gyro address
+  if(Wire.endTransmission() == 0) {
     GYRO_FLAG = true;
   }
+  if(GYRO_FLAG && !gyro.begin())
+  {
+    /* There was a problem detecting the L3GD20 ... check your connections */
+    Serial.println(F("Ooops, no L3GD20 (Gyroscope) detected ... Check your wiring!"));
+  } else {
+    Serial.println(F("The following sensor has been initialised:"));
+    displaySensorDetails(&gyro);
+    gyro.enableAutoRange(true);   
+ }
+  
+
+  ///////
+  // TODO: CLEAN THIS UP LATER
+  ///////
+
+  ///////
+  // RADIO TRANSMIT CODE
+  ///////
+
+  Serial.println(F("Initializing radio"));
+
+  pinMode(RFM95_RST, OUTPUT);
+  digitalWrite(RFM95_RST, HIGH);
+
+  // manual reset
+  digitalWrite(RFM95_RST, LOW);
+  delay(10);
+  digitalWrite(RFM95_RST, HIGH);
+  delay(10);
+
+  if (!rf95.init()) {
+    Serial.println("LoRa radio init failed");
+  
+  } else {
+
+    Serial.println("LoRa radio init OK!");
+
+    // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
+    if (!rf95.setFrequency(RF95_FREQ)) {
+      Serial.println("setFrequency failed");
+      while (1);
+    }
+    Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
+    
+    // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
+  
+    // The default transmitter power is 13dBm, using PA_BOOST.
+    // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
+    // you can set transmitter powers from 5 to 23 dBm:
+    rf95.setTxPower(23, false);
+    //index values for setModemConfig, all are predefined
+    //0 = Bw125Cr45Sf128
+    //1 = Bw500Cr45Sf128
+    //2 = Bw31_25Cr48Sf512
+    //3 = Bw125Cr48Sf4096
+    //optional to set own modem configuration values, but must use setModemRegisters(const ModemConfig * config)
+    rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512); // can also use  rh_rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); 
+
+    RADIO_FLAG = true;
+  }
+  
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  datapacket* currentPacket = new datapacket;
-  populateDataPacket(currentPacket);
-  printDataPacket(currentPacket);
-  delete currentPacket;
-  delay(500);
-}
+
+/////////////////////////
+/* populateDataPacket */
+/////////////////////////
+
+/*
+ * Function for populating datapacket with relevant data
+ * 
+ * Arguments:
+ *  packet: datapacket * - datapacket to be modified
+ * 
+ * Return:
+ *  None
+ * 
+ */
 
 void populateDataPacket(struct datapacket* packet) {
+
+  packet->timestamp = millis(); //Should not overflow until over 50 days
+  
   getAccelerometerData(packet);
   getTemperatureData(packet);
   getBarometerData(packet);
@@ -121,52 +215,103 @@ void populateDataPacket(struct datapacket* packet) {
 void displaySensorDetails(Adafruit_Sensor* currentSensor) {
   sensor_t sensor;
   currentSensor->getSensor(&sensor);
-  Serial.println("------------------------------------");
-  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" uT");
-  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" uT");
-  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" uT");  
-  Serial.println("------------------------------------");
+  Serial.println(F("------------------------------------"));
+  Serial.print  (F("Sensor:       ")); Serial.println(sensor.name);
+  Serial.print  (F("Driver Ver:   ")); Serial.println(sensor.version);
+  Serial.print  (F("Unique ID:    ")); Serial.println(sensor.sensor_id);
+  Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(" uT");
+  Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(" uT");
+  Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution); Serial.println(" uT");  
+  Serial.println(F("------------------------------------"));
   Serial.println("");
   delay(500);
 }
 
-// TODO: Currently prints X, Y, Z acceleration. Return format TBD.
-void getAccelerometerData(struct datapacket* packet) {
+/////////////////////////
+/* getxxxData */
+/////////////////////////
+
+/*
+ * Helper Functions for getting data from sensors
+ * 
+ * Arguments:
+ *  packet: datapacket * - datapacket to be modified
+ * 
+ * Return:
+ *  True if sensor is working, false otherwise
+ * 
+ */
+ 
+bool getAccelerometerData(struct datapacket* packet) {
+  
+  if(!ACC_FLAG) {
+    packet->accel_x = myNAN;
+    packet->accel_y = myNAN;
+    packet->accel_z = myNAN;
+    return false;
+  }
   sensors_event_t event; 
   accel.getEvent(&event);
   /* Populate the datapacket with the results (acceleration is measured in m/s^2) */
   packet->accel_x = event.acceleration.x;
   packet->accel_y = event.acceleration.y;
   packet->accel_z = event.acceleration.z;
+
+  return true;
 }
 
-void getTemperatureData(struct datapacket* packet) {
+bool getTemperatureData(struct datapacket* packet) {
   // Read and populate datapacket with the temperature, then convert to *F
+  if(!TEMP_FLAG) {
+    packet->temp_tempC = myNAN;
+    packet->temp_tempF = myNAN;
+    
+    return false;
+  }
+  
   float c = tempsensor.readTempC();
   float f = c * 9.0 / 5.0 + 32;
   packet->temp_tempC = c;
   packet->temp_tempF = f;
+
+  return true;
 }
 
-void getBarometerData(struct datapacket* packet) {
+bool getBarometerData(struct datapacket* packet) {
   // Our weather page presents pressure in Inches (Hg)
   // Use http://www.onlineconversion.com/pressure.htm for other units
+  if(!BARO_FLAG) {
+    packet->baro_pressure = myNAN;
+    packet->baro_altitude = myNAN;
+    packet->baro_tempC = myNAN;
+    return false;
+  }
+  
   packet->baro_pressure = baro.getPressure()/3377; // NOTE: in mmHG!!
   packet->baro_altitude = baro.getAltitude();
   packet->baro_tempC = baro.getTemperature();
+
+  return true;
 }
 
-void getGyroscopeData(struct datapacket* packet) {
+bool getGyroscopeData(struct datapacket* packet) {
+  
+  if(!GYRO_FLAG) {
+    packet->gyro_x = myNAN;
+    packet->gyro_y = myNAN;
+    packet->gyro_z = myNAN;
+    return false;
+  }
+  
   sensors_event_t event; 
   gyro.getEvent(&event);
 
   /* Populate datapacket with the results (speed is measured in rad/s) */
   packet->gyro_x = event.gyro.x;
-  packet->gyro_x = event.gyro.x;
-  packet->gyro_x = event.gyro.x;
+  packet->gyro_y = event.gyro.y;
+  packet->gyro_z = event.gyro.z;
+
+  return true;
 }
 
 
@@ -177,7 +322,16 @@ void getGyroscopeData(struct datapacket* packet) {
 */
 // TODO: Figure out what we want returned from a Magnetometer read - {x, y, z} OR {heading} OR both?
 // TODO: For now, functions just print to serial, will see what we want to do with data once we have a better understanding of things.
-void getMagnetometerReading(struct datapacket* packet) {
+bool getMagnetometerReading(struct datapacket* packet) {
+  if(!MAG_FLAG) {
+    packet->mag_x = myNAN;
+    packet->mag_y = myNAN;
+    packet->mag_z = myNAN;
+    packet->mag_heading = myNAN;
+    return false;
+  }
+  
+  
   sensors_event_t event; 
   mag.getEvent(&event);
 
@@ -209,80 +363,175 @@ void getMagnetometerReading(struct datapacket* packet) {
   float headingDegrees = heading * 180/M_PI; 
   
   packet->mag_heading = headingDegrees;
+
+  return true;
 }
+
+/////////////////////////
+/* printDataPacket */
+/////////////////////////
+
+/*
+ * Function for printingDataPacket
+ * 
+ * Arguments:
+ *  packet: datapacket * - datapacket to be printed
+ *  
+ * Return:
+ *  none
+ * 
+ */
+
 
 void printDataPacket(struct datapacket* packet) {
   
-  Serial.println("------------------------------------");
-  Serial.println("---------!!START OF PACKET!!--------");
-  Serial.println("------------------------------------\n");
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("---------!!START OF PACKET!!--------"));
+  Serial.println(F("------------------------------------\n"));
+
+  // Print timestamp
+  Serial.print(F("Timestamp: ")); Serial.println(packet->timestamp);
 
   // Print Accelerometer Data
-  Serial.println("------------------------------------");
-  Serial.println("ACCELEROMETER:");
-  Serial.println("------------------------------------");
-  if (ACC_FLAG) {
-    /* Display the results (acceleration is measured in m/s^2) */
-    Serial.print("X: "); Serial.print(packet->accel_x); Serial.print("  ");
-    Serial.print("Y: "); Serial.print(packet->accel_y); Serial.print("  ");
-    Serial.print("Z: "); Serial.print(packet->accel_z); Serial.print("  ");Serial.println("m/s^2 ");
-  } else {
-    Serial.print("NO ACCELEROMETER CONNECTED!");
-  }
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("ACCELEROMETER:"));
+  Serial.println(F("------------------------------------"));
+  
+  /* Display the results (acceleration is measured in m/s^2) */
+  Serial.print("X: "); Serial.print(packet->accel_x); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(packet->accel_y); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(packet->accel_z); Serial.print("  ");Serial.println("m/s^2 ");
+  
   
   // Print Gyroscope Data
-  Serial.println("------------------------------------");
-  Serial.println("GYROSCOPE:");
-  Serial.println("------------------------------------");
-  if (GYRO_FLAG) {
-    /* Display the results (acceleration is measured in m/s^2) */
-    Serial.print("X: "); Serial.print(packet->gyro_x); Serial.print("  ");
-    Serial.print("Y: "); Serial.print(packet->gyro_y); Serial.print("  ");
-    Serial.print("Z: "); Serial.print(packet->gyro_z); Serial.print("  ");Serial.println("rad/s ");
-  } else {
-    Serial.print("NO GYROSCOPE CONNECTED!");
-  }
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("GYROSCOPE:"));
+  Serial.println(F("------------------------------------"));
+  
+  /* Display the results (acceleration is measured in m/s^2) */
+  Serial.print("X: "); Serial.print(packet->gyro_x); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(packet->gyro_y); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(packet->gyro_z); Serial.print("  ");Serial.println("rad/s ");
+  
 
   // Print Magnetometer Data
-  Serial.println("------------------------------------");
-  Serial.println("MAGNETOMETER:");
-  Serial.println("------------------------------------");
-  if (MAG_FLAG) {
-    /* Display the results (acceleration is measured in m/s^2) */
-    Serial.print("X: "); Serial.print(packet->mag_x); Serial.print("  ");
-    Serial.print("Y: "); Serial.print(packet->mag_y); Serial.print("  ");
-    Serial.print("Z: "); Serial.print(packet->mag_z); Serial.print("  ");Serial.println("m/s^2 ");
-    Serial.print("Heading (degrees): "); Serial.println(packet->mag_heading);
-  } else {
-    Serial.print("NO MAGNETOMETER CONNECTED!");
-  }
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("MAGNETOMETER:"));
+  Serial.println(F("------------------------------------"));
+  
+  /* Display the results (acceleration is measured in m/s^2) */
+  Serial.print("X: "); Serial.print(packet->mag_x); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(packet->mag_y); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(packet->mag_z); Serial.print("  ");Serial.println("m/s^2 ");
+  Serial.print(F("Heading (degrees): ")); Serial.println(packet->mag_heading);
+ 
 
   // Print Temperature data
-  Serial.println("------------------------------------");
-  Serial.println("TEMPERATURE:");
-  Serial.println("------------------------------------");
-  if (TEMP_FLAG) {
-    Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.print("*C\t"); 
-    Serial.print(packet->temp_tempF); Serial.println("*F");
-  } else {
-    Serial.print("NO TEMPERATURE SENSOR CONNECTED!");
-  }
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("TEMPERATURE:"));
+  Serial.println(F("------------------------------------"));
+  
+  Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.print("*C\t"); 
+  Serial.print(packet->temp_tempF); Serial.println("*F");
+  
 
   // Print Barometer Data
-  Serial.println("------------------------------------");
-  Serial.println("BAROMETER:");
-  Serial.println("------------------------------------");
-  if (BARO_FLAG) {
-    Serial.print(packet->baro_pressure); Serial.println(" Inches (Hg)");
-    Serial.print(packet->baro_altitude); Serial.println(" meters");
-    Serial.print(packet->baro_tempC); Serial.println("*C");
-  } else {
-    Serial.print("NO BAROMETER CONNECTED!");
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("BAROMETER:"));
+  Serial.println(F("------------------------------------"));
+  
+  Serial.print(packet->baro_pressure); Serial.println(" Inches (Hg)");
+  Serial.print(packet->baro_altitude); Serial.println(" meters");
+  Serial.print(packet->baro_tempC); Serial.println("*C");
+  
+
+  Serial.println(F("\n------------------------------------"));
+  Serial.println(F("----------!!END OF PACKET!!---------"));
+  Serial.println(F("------------------------------------"));
+}
+
+/////////////////////////
+/* radio_send */
+/////////////////////////
+
+/*
+ * Function for sending message through radio
+ * 
+ * Arguments:
+ *  msg: char * - Message to be sent
+ *  len: int - Length of the message
+ * 
+ * Return:
+ *  True if message is sent, false otherwise
+ * 
+ */
+
+bool radio_send(uint8_t * msg, int len) {
+  Serial.println("Sending to rf95_server");
+  // Send a message to rf95_server
+  
+  Serial.println("Sending..."); 
+  bool ret = rf95.send(msg, len);
+
+
+  Serial.println("Waiting for packet to complete..."); 
+  rf95.waitPacketSent();
+
+  return ret;
+}
+
+
+/////////////////////////
+/* send_packet */
+/////////////////////////
+
+/*
+ * Function for sending packet through radio
+ * 
+ * Arguments:
+ *  packet: struct datapacket * - packet to be sent
+ * 
+ * Return:
+ *  True if message is sent, false otherwise
+ * 
+ */
+
+bool send_packet(struct datapacket *packet) {
+  byte tx_buf[sizeof(datapacket)] = {0};
+
+  int zize = sizeof(*packet);
+  memcpy(tx_buf, packet, zize);
+  
+  return radio_send((uint8_t *)tx_buf, zize);
+}
+
+
+ 
+
+/////////////////////////
+/////// MAIN LOOP ///////
+/////////////////////////
+
+void loop() {
+  
+  datapacket* currentPacket = new datapacket;
+  
+  Serial.println("Populating packet");
+  populateDataPacket(currentPacket);
+
+  Serial.println("Printing packet");
+  printDataPacket(currentPacket);
+
+  //Send data packet to radio
+  if(RADIO_FLAG) {
+    bool ret = send_packet(currentPacket);
+    if(!ret) {
+      Serial.println("Packet sending failed");
+    }
   }
-
-
-  Serial.println("\n------------------------------------");
-  Serial.println("----------!!END OF PACKET!!---------");
-  Serial.println("------------------------------------");
+  
+  
+  delete currentPacket;
+  delay(500);
 }
 
