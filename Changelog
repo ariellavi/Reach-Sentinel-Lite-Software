@@ -1,11 +1,12 @@
 Changelog
 
+Edward 2/28/2018
+- Program now waits for whenever radio is available, then sends a packet
+- Removed waitRadioSend() in send() from RadioHead's library, so that sensor sampling is not impacted by radio transmission
+
 Edward 2/26/2018
 - Added functions for sending to radio
 - Added comments to functions
 - Fixed bug where sensor is initialized/asked for data when not connected
 
 
-Currently known bugs
-- IMPORTANT: Threading not implemented, sensors have to wait til radio finishes sending data to continue 
-- MAG_FLAG is set when magnetometer is disconnected
