@@ -29,6 +29,7 @@ Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false, RADIO_FLAG = false;
 
 float myNAN = sqrt(-1);
+unsigned long previousMillis = 0;
 
 //////////////////////
 /*Radio definitions */
@@ -60,12 +61,11 @@ struct datapacket {
   float mag_y;
   float mag_z;
   float mag_heading;
-  float temp_tempF; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
   float temp_tempC; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
   float baro_pressure; // in mmHg
   float baro_altitude; // in meters
   float baro_tempC;
-};
+} currentPacket;
 
 //////////////////////
 /*SETUP */
@@ -264,7 +264,6 @@ bool getTemperatureData(struct datapacket* packet) {
   // Read and populate datapacket with the temperature, then convert to *F
   if(!TEMP_FLAG) {
     packet->temp_tempC = myNAN;
-    packet->temp_tempF = myNAN;
     
     return false;
   }
@@ -272,7 +271,6 @@ bool getTemperatureData(struct datapacket* packet) {
   float c = tempsensor.readTempC();
   float f = c * 9.0 / 5.0 + 32;
   packet->temp_tempC = c;
-  packet->temp_tempF = f;
 
   return true;
 }
@@ -385,17 +383,17 @@ bool getMagnetometerReading(struct datapacket* packet) {
 
 void printDataPacket(struct datapacket* packet) {
   
-  Serial.println(F("------------------------------------"));
-  Serial.println(F("---------!!START OF PACKET!!--------"));
-  Serial.println(F("------------------------------------\n"));
+  //Serial.println(F("------------------------------------"));
+  //Serial.println(F("---------!!START OF PACKET!!--------"));
+  //Serial.println(F("------------------------------------\n"));
 
   // Print timestamp
   Serial.print(F("Timestamp: ")); Serial.println(packet->timestamp);
 
   // Print Accelerometer Data
-  Serial.println(F("------------------------------------"));
+  //Serial.println(F("------------------------------------"));
   Serial.println(F("ACCELEROMETER:"));
-  Serial.println(F("------------------------------------"));
+  //Serial.println(F("------------------------------------"));
   
   /* Display the results (acceleration is measured in m/s^2) */
   Serial.print("X: "); Serial.print(packet->accel_x); Serial.print("  ");
@@ -431,8 +429,7 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("TEMPERATURE:"));
   Serial.println(F("------------------------------------"));
   
-  Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.print("*C\t"); 
-  Serial.print(packet->temp_tempF); Serial.println("*F");
+  Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.println("*C\t"); 
   
 
   // Print Barometer Data
@@ -475,7 +472,7 @@ bool radio_send(uint8_t * msg, int len) {
 
 
   Serial.println("Waiting for packet to complete..."); 
-  rf95.waitPacketSent();
+  //rf95.waitPacketSent();
 
   return ret;
 }
@@ -513,25 +510,31 @@ bool send_packet(struct datapacket *packet) {
 /////////////////////////
 
 void loop() {
-  
-  datapacket* currentPacket = new datapacket;
-  
-  Serial.println("Populating packet");
-  populateDataPacket(currentPacket);
 
-  Serial.println("Printing packet");
-  printDataPacket(currentPacket);
+  unsigned long currentMillis = millis();
 
-  //Send data packet to radio
-  if(RADIO_FLAG) {
-    bool ret = send_packet(currentPacket);
+  if(currentMillis - previousMillis >= 50) {
+    
+    Serial.println("Populating packet");
+    populateDataPacket(&currentPacket);
+  
+    Serial.println("Printing packet");
+    //printDataPacket(&currentPacket);
+    Serial.println(currentPacket.timestamp);
+    Serial.println(currentPacket.accel_x);
+  
+    previousMillis = currentMillis;
+    
+  }
+
+  //Send data packet to radio, if radio is available
+  if(RADIO_FLAG && rf95.waitPacketSent(1)) {
+    bool ret = send_packet(&currentPacket);
     if(!ret) {
       Serial.println("Packet sending failed");
     }
   }
+
   
-  
-  delete currentPacket;
-  delay(500);
 }
 

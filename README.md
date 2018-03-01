@@ -28,8 +28,7 @@ struct datapacket {
   float mag_x;
   float mag_y;
   float mag_z;
-  float mag_heading;
-  float temp_tempF; 
+  float mag_heading; 
   float temp_tempC;
   float baro_pressure; // in mmHg
   float baro_altitude; // in meters
@@ -38,5 +37,4 @@ struct datapacket {
 ```
 
 ## Currently known bugs ##
-- IMPORTANT: Threading is not implemented, program have to wait until radio finishes sending data to continue reading from sensors
 - MAG_FLAG is set when magnetometer is disconnected
