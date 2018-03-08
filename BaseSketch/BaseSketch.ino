@@ -177,7 +177,30 @@ void setup() {
     //2 = Bw31_25Cr48Sf512
     //3 = Bw125Cr48Sf4096
     //optional to set own modem configuration values, but must use setModemRegisters(const ModemConfig * config)
-    rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512); // can also use  rh_rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); 
+
+   
+  
+ //Setting Custom ModemConfig values
+ // look at RH_RF95.h for specific regsiter values
+  /* 
+  RH_RF95::ModemConfig custom_config = {
+    [1] Sets BW: 
+    [2] Sets SF
+    [3] Sets AGC and Low Data Rate Optimization 
+  };  
+  */
+
+  rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); // can also use  rh_rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); 
+  /*
+  RH_RF95::ModemConfig custom_config = {
+    0x92, // BW = 500, CR = 4/5
+    0xc4, //SF = 4096 chips/symbol, CRC = enable
+    0x08  // Low date rate = on, AGC = off
+  };
+    
+
+  rf95.setModemRegisters(&custom_config);
+  */
 
     RADIO_FLAG = true;
   }
