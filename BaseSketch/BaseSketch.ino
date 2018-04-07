@@ -340,18 +340,6 @@ void printDataPacket(struct datapacket* packet) {
   Serial.print(F("X: ")); Serial.print(packet->gyro_x); Serial.print(F("  "));
   Serial.print(F("Y: ")); Serial.print(packet->gyro_y); Serial.print(F("  "));
   Serial.print(F("Z: ")); Serial.print(packet->gyro_z); Serial.print(F("  "));Serial.println(F("rad/s "));
-  
-
-  // Print Magnetometer Data
-  Serial.println(F("------------------------------------"));
-  Serial.println(F("MAGNETOMETER:"));
-  Serial.println(F("------------------------------------"));
-  
-  /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print(F("X: ")); Serial.print(packet->mag_x); Serial.print(F("  "));
-  Serial.print(F("Y: ")); Serial.print(packet->mag_y); Serial.print(F("  "));
-  Serial.print(F("Z: ")); Serial.print(packet->mag_z); Serial.print(F("  "));Serial.println(F("m/s^2 "));
-  Serial.print(F("Heading (degrees): ")); Serial.println(packet->mag_heading);
  
 
   // Print Temperature data
