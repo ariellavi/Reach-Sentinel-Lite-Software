@@ -99,7 +99,7 @@ void setup() {
   // Initialising Barometer
   if(!baro.begin()) {
     /* There was a problem detecting the MPL3115A2 ... check your connections */
-    Serial.println("Ooops, no MPL3115A2 (Barometer) detected ... Check your wiring!");
+    Serial.println(F("Ooops, no MPL3115A2 (Barometer) detected ... Check your wiring!"));
   } else {
     Serial.println(F("The following sensor has been initialised: BAROMETER"));
     // ~displaySensorDetails(&baro);~ Display details functionality not enabled by Adafruit.
@@ -152,18 +152,18 @@ void setup() {
   delay(10);
 
   if (!rf95.init()) {
-    Serial.println("LoRa radio init failed");
+    Serial.println(F("LoRa radio init failed"));
   
   } else {
 
-    Serial.println("LoRa radio init OK!");
+    Serial.println(F("LoRa radio init OK!"));
 
     // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
     if (!rf95.setFrequency(RF95_FREQ)) {
-      Serial.println("setFrequency failed");
+      Serial.println(F("setFrequency failed"));
       while (1);
     }
-    Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
+    Serial.print(F("Set Freq to: ")); Serial.println(RF95_FREQ);
     
     // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
   
@@ -219,11 +219,11 @@ void displaySensorDetails(Adafruit_Sensor* currentSensor) {
   Serial.print  (F("Sensor:       ")); Serial.println(sensor.name);
   Serial.print  (F("Driver Ver:   ")); Serial.println(sensor.version);
   Serial.print  (F("Unique ID:    ")); Serial.println(sensor.sensor_id);
-  Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(" uT");
-  Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(" uT");
-  Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution); Serial.println(" uT");  
+  Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(F(" uT"));
+  Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(F(" uT"));
+  Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution); Serial.println(F(" uT"));  
   Serial.println(F("------------------------------------"));
-  Serial.println("");
+  Serial.println(F(""));
   delay(500);
 }
 
@@ -396,9 +396,9 @@ void printDataPacket(struct datapacket* packet) {
   //Serial.println(F("------------------------------------"));
   
   /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print("X: "); Serial.print(packet->accel_x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(packet->accel_y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(packet->accel_z); Serial.print("  ");Serial.println("m/s^2 ");
+  Serial.print(F("X: ")); Serial.print(packet->accel_x); Serial.print(F("  "));
+  Serial.print(F("Y: ")); Serial.print(packet->accel_y); Serial.print(F("  "));
+  Serial.print(F("Z: ")); Serial.print(packet->accel_z); Serial.print(F("  "));Serial.println(F("m/s^2 "));
   
   
   // Print Gyroscope Data
@@ -407,9 +407,9 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("------------------------------------"));
   
   /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print("X: "); Serial.print(packet->gyro_x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(packet->gyro_y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(packet->gyro_z); Serial.print("  ");Serial.println("rad/s ");
+  Serial.print(F("X: ")); Serial.print(packet->gyro_x); Serial.print(F("  "));
+  Serial.print(F("Y: ")); Serial.print(packet->gyro_y); Serial.print(F("  "));
+  Serial.print(F("Z: ")); Serial.print(packet->gyro_z); Serial.print(F("  "));Serial.println(F("rad/s "));
   
 
   // Print Magnetometer Data
@@ -418,9 +418,9 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("------------------------------------"));
   
   /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print("X: "); Serial.print(packet->mag_x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(packet->mag_y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(packet->mag_z); Serial.print("  ");Serial.println("m/s^2 ");
+  Serial.print(F("X: ")); Serial.print(packet->mag_x); Serial.print(F("  "));
+  Serial.print(F("Y: ")); Serial.print(packet->mag_y); Serial.print(F("  "));
+  Serial.print(F("Z: ")); Serial.print(packet->mag_z); Serial.print(F("  "));Serial.println(F("m/s^2 "));
   Serial.print(F("Heading (degrees): ")); Serial.println(packet->mag_heading);
  
 
@@ -429,7 +429,7 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("TEMPERATURE:"));
   Serial.println(F("------------------------------------"));
   
-  Serial.print("Temp: "); Serial.print(packet->temp_tempC); Serial.println("*C\t"); 
+  Serial.print(F("Temp: ")); Serial.print(packet->temp_tempC); Serial.println(F("*C\t")); 
   
 
   // Print Barometer Data
@@ -437,9 +437,9 @@ void printDataPacket(struct datapacket* packet) {
   Serial.println(F("BAROMETER:"));
   Serial.println(F("------------------------------------"));
   
-  Serial.print(packet->baro_pressure); Serial.println(" Inches (Hg)");
-  Serial.print(packet->baro_altitude); Serial.println(" meters");
-  Serial.print(packet->baro_tempC); Serial.println("*C");
+  Serial.print(packet->baro_pressure); Serial.println(F(" Inches (Hg)"));
+  Serial.print(packet->baro_altitude); Serial.println(F(" meters"));
+  Serial.print(packet->baro_tempC); Serial.println(F("*C"));
   
 
   Serial.println(F("\n------------------------------------"));
@@ -464,14 +464,14 @@ void printDataPacket(struct datapacket* packet) {
  */
 
 bool radio_send(uint8_t * msg, int len) {
-  Serial.println("Sending to rf95_server");
+  Serial.println(F("Sending to rf95_server"));
   // Send a message to rf95_server
   
-  Serial.println("Sending..."); 
+  Serial.println(F("Sending...")); 
   bool ret = rf95.send(msg, len);
 
 
-  Serial.println("Waiting for packet to complete..."); 
+  Serial.println(F("Waiting for packet to complete...")); 
   //rf95.waitPacketSent();
 
   return ret;
@@ -515,10 +515,10 @@ void loop() {
 
   if(currentMillis - previousMillis >= 50) {
     
-    Serial.println("Populating packet");
+    Serial.println(F("Populating packet"));
     populateDataPacket(&currentPacket);
   
-    Serial.println("Printing packet");
+    Serial.println(F("Printing packet"));
     //printDataPacket(&currentPacket);
     Serial.println(currentPacket.timestamp);
     Serial.println(currentPacket.accel_x);
@@ -531,7 +531,7 @@ void loop() {
   if(RADIO_FLAG && rf95.waitPacketSent(1)) {
     bool ret = send_packet(&currentPacket);
     if(!ret) {
-      Serial.println("Packet sending failed");
+      Serial.println(F("Packet sending failed"));
     }
   }
 
