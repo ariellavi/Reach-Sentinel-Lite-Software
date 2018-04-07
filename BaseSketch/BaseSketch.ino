@@ -14,6 +14,9 @@
 // If using software serial, keep this line enabled
 // (you can change the pin numbers to match your wiring):
 SoftwareSerial mySerial(3, 2);
+Adafruit_GPS GPS(&mySerial);
+
+
 // Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
 // Set to 'true' if you want to debug and listen to the raw GPS sentences. 
 #define GPSECHO  false
@@ -40,7 +43,9 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808(); // Temperature Sensor
 */
 Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 
-bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false, RADIO_FLAG = false;
+// IMP_TODO: Figure out a way to handle disconnected GPS!!!
+
+bool MAG_FLAG = false, ACC_FLAG = false, GYRO_FLAG = false, BARO_FLAG = false, TEMP_FLAG = false, RADIO_FLAG = false, GPS_FLAG = true;
 
 float myNAN = sqrt(-1);
 unsigned long previousMillis = 0;
@@ -76,7 +81,7 @@ struct datapacket {
   float GPS_altitude;
   uint8_t GPS_hour;
   uint8_t GPS_minute;
-  uint8_t GPS_second;
+  uint8_t GPS_seconds;
   float temp_tempC; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
   float baro_pressure; // in mmHg
   float baro_altitude; // in meters
@@ -201,7 +206,7 @@ void setup() {
 
     RADIO_FLAG = true;
   }
-  
+  delay(3000);
 }
 
 ////////////////////////////////////////////////
@@ -362,6 +367,51 @@ bool getGyroscopeData(struct datapacket* packet) {
   return true;
 }
 
+bool getGPSData(struct datapacket* packet) {
+  if (!GPS_FLAG) {
+    packet->GPS_latitude = myNAN;
+    packet->GPS_longitude = myNAN;
+    packet->GPS_altitude = myNAN;
+    packet->GPS_hour = 0;
+    packet->GPS_minute = 0;
+    packet->GPS_seconds = 0;
+    return false;
+  }
+
+  if (GPS.newNMEAreceived()) {
+  // a tricky thing here is if we print the NMEA sentence, or data
+  // we end up not listening and catching other sentences! 
+  // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
+  //Serial.println(GPS.lastNMEA());   // this also sets the newNMEAreceived() flag to false
+  
+    if (!GPS.parse(GPS.lastNMEA())) {   // this also sets the newNMEAreceived() flag to false
+      packet->GPS_latitude = myNAN;
+      packet->GPS_longitude = myNAN;
+      packet->GPS_altitude = myNAN;
+      packet->GPS_hour = 0;
+      packet->GPS_minute = 0;
+      packet->GPS_seconds = 0;
+      return false;  // we can fail to parse a sentence in which case we should just wait for another
+    }
+  }
+
+  if (GPS.fix) {
+    packet->GPS_latitude = GPS.latitudeDegrees;
+    packet->GPS_longitude = GPS.longitudeDegrees;
+    packet->GPS_altitude = GPS.altitude;
+    packet->GPS_hour = GPS.hour;
+    packet->GPS_minute = GPS.minute;
+    packet->GPS_seconds = GPS.seconds;
+  } else {
+    packet->GPS_latitude = myNAN;
+    packet->GPS_longitude = myNAN;
+    packet->GPS_altitude = myNAN;
+    packet->GPS_hour = 0;
+    packet->GPS_minute = 0;
+    packet->GPS_seconds = 0;
+  }
+}
+
 /////////////////////////
 /* printDataPacket */
 /////////////////////////
@@ -425,6 +475,15 @@ void printDataPacket(struct datapacket* packet) {
   Serial.print(packet->baro_pressure); Serial.println(F(" Inches (Hg)"));
   Serial.print(packet->baro_altitude); Serial.println(F(" meters"));
   Serial.print(packet->baro_tempC); Serial.println(F("*C"));
+
+  // Print GPS Data
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("GPS:"));
+  Serial.println(F("------------------------------------"));
+  
+  Serial.print(packet->GPS_latitude); Serial.println(F(" latitude"));
+  Serial.print(packet->GPS_longitude); Serial.println(F(" longitude"));
+  Serial.print(packet->GPS_altitude); Serial.println(F(" altitude"));
   
 
   Serial.println(F("\n------------------------------------"));
@@ -507,6 +566,10 @@ void loop() {
     //printDataPacket(&currentPacket);
     Serial.println(currentPacket.timestamp);
     Serial.println(currentPacket.accel_x);
+    Serial.print(F("Location (in degrees, works with Google Maps): "));
+    Serial.print(currentPacket.GPS_latitude, 4);
+    Serial.print(F(", ")); 
+    Serial.println(currentPacket.GPS_longitude, 4);
   
     previousMillis = currentMillis;
     
