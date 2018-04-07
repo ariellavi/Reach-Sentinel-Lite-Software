@@ -2,7 +2,6 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_ADXL345_U.h>
-#include <Adafruit_HMC5883_U.h>
 #include <Adafruit_MPL3115A2.h>
 #include <Adafruit_L3GD20_U.h>
 #include "Adafruit_MCP9808.h"
@@ -12,7 +11,6 @@
 
 /* Note: Since the sensors are declared globally, the respective sensor functions assume their successful declaration here */
 /* Must assign a unique ID to each sensor: */
-Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345); // Magnetometer
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12346); // Accelerometer
 Adafruit_L3GD20_Unified gyro = Adafruit_L3GD20_Unified(12347); // Gyroscope
 Adafruit_MCP9808 tempsensor = Adafruit_MCP9808(); // Temperature Sensor
@@ -57,10 +55,6 @@ struct datapacket {
   float gyro_x;
   float gyro_y;
   float gyro_z;
-  float mag_x;
-  float mag_y;
-  float mag_z;
-  float mag_heading;
   float temp_tempC; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
   float baro_pressure; // in mmHg
   float baro_altitude; // in meters
@@ -73,16 +67,6 @@ struct datapacket {
 
 void setup() {
   Serial.begin(9600);
-
-  // Initialising Magnetometer
-  //if(!mag.begin()) {
-  //  /* There was a problem detecting the HMC5883 ... check your connections */
-  //  Serial.println(F("Ooops, no HMC5883 (Magnetometer) detected ... Check your wiring!"));
-  //} else {
-  //  Serial.println(F("The following sensor has been initialised:"));
-  //  displaySensorDetails(&mag);
-    //MAG_FLAG = true;
-  //}
 
   // Initialising Accelerometer
   if(!accel.begin()) {
@@ -208,7 +192,6 @@ void populateDataPacket(struct datapacket* packet) {
   getTemperatureData(packet);
   getBarometerData(packet);
   getGyroscopeData(packet);
-  getMagnetometerReading(packet);
 }
 
 // Takes a pointer to the sensor object as a parameter and displays the details.
@@ -308,59 +291,6 @@ bool getGyroscopeData(struct datapacket* packet) {
   packet->gyro_x = event.gyro.x;
   packet->gyro_y = event.gyro.y;
   packet->gyro_z = event.gyro.z;
-
-  return true;
-}
-
-
-/* TODO: Figure out what mag.getEvent() (and, by extension, a call to this function) means for synchronicity.
- *  Will it wait until it gets data from the Magnetometer?
- *  Will it instruct the sensor to take a reading at the instant the function is called?
- *  Will it read from a buffer of existing data?
-*/
-// TODO: Figure out what we want returned from a Magnetometer read - {x, y, z} OR {heading} OR both?
-// TODO: For now, functions just print to serial, will see what we want to do with data once we have a better understanding of things.
-bool getMagnetometerReading(struct datapacket* packet) {
-  if(!MAG_FLAG) {
-    packet->mag_x = myNAN;
-    packet->mag_y = myNAN;
-    packet->mag_z = myNAN;
-    packet->mag_heading = myNAN;
-    return false;
-  }
-  
-  
-  sensors_event_t event; 
-  mag.getEvent(&event);
-
-  /* Populate datapacket with the results (magnetic vector values are in micro-Tesla (uT)) */
-  packet->mag_x = event.magnetic.x;
-  packet->mag_y = event.magnetic.y;
-  packet->mag_z = event.magnetic.z;
-
-  // Hold the module so that Z is pointing 'up' and you can measure the heading with x&y
-  // Calculate heading when the magnetometer is level, then correct for signs of axis.
-  float heading = atan2(event.magnetic.y, event.magnetic.x);
-  
-  // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
-  // TODO: Find yours here: http://www.magnetic-declination.com/
-  // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
-  // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
-  float declinationAngle = 0.22;
-  heading += declinationAngle;
-  
-  // Correct for when signs are reversed.
-  if(heading < 0)
-    heading += 2*PI;
-    
-  // Check for wrap due to addition of declination.
-  if(heading > 2*PI)
-    heading -= 2*PI;
-   
-  // Convert radians to degrees for readability.
-  float headingDegrees = heading * 180/M_PI; 
-  
-  packet->mag_heading = headingDegrees;
 
   return true;
 }
