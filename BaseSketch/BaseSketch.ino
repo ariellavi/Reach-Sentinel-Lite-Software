@@ -6,6 +6,22 @@
 #include <Adafruit_L3GD20_U.h>
 #include "Adafruit_MCP9808.h"
 
+/////////////////////////////
+////// GPS Globals///////////
+/////////////////////////////
+#include <Adafruit_GPS.h>
+#include <SoftwareSerial.h>
+// If using software serial, keep this line enabled
+// (you can change the pin numbers to match your wiring):
+SoftwareSerial mySerial(3, 2);
+// Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
+// Set to 'true' if you want to debug and listen to the raw GPS sentences. 
+#define GPSECHO  false
+// this keeps track of whether we're using the interrupt
+// off by default!
+boolean usingInterrupt = false; // (init to false, but set to true in set up code)
+void useInterrupt(boolean); // Func prototype keeps Arduino 0023 happy
+
 #include <SPI.h>
 #include <RH_RF95.h>
 
@@ -55,6 +71,12 @@ struct datapacket {
   float gyro_x;
   float gyro_y;
   float gyro_z;
+  float GPS_latitude;
+  float GPS_longitude;
+  float GPS_altitude;
+  uint8_t GPS_hour;
+  uint8_t GPS_minute;
+  uint8_t GPS_second;
   float temp_tempC; // TODO: remove or keep depending on if the Adafruit_MCP9808 sensor is used
   float baro_pressure; // in mmHg
   float baro_altitude; // in meters
@@ -66,7 +88,7 @@ struct datapacket {
 //////////////////////
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // Initialising Accelerometer
   if(!accel.begin()) {
@@ -114,6 +136,20 @@ void setup() {
     displaySensorDetails(&gyro);
     gyro.enableAutoRange(true);   
  }
+
+  // Initialising GPS
+  Serial.println(F("Init GPS"));
+  // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
+  GPS.begin(9600);
+  
+  // turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  // Set the update rate
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
+  // the nice thing about this code is you can have a timer0 interrupt go off
+  // every 1 millisecond, and read data from the GPS for you. that makes the
+  // loop code a heck of a lot easier!
+  useInterrupt(true);
   
 
   ///////
@@ -168,6 +204,36 @@ void setup() {
   
 }
 
+////////////////////////////////////////////////
+//////// GPS Interrupt Functions ///////////////
+////////////////////////////////////////////////
+
+// Interrupt is called once a millisecond, looks for any new GPS data, and stores it
+SIGNAL(TIMER0_COMPA_vect) {
+  char c = GPS.read();
+  // if you want to debug, this is a good time to do it!
+#ifdef UDR0
+  if (GPSECHO)
+    if (c) UDR0 = c;  
+    // writing direct to UDR0 is much much faster than Serial.print 
+    // but only one character can be written at a time. 
+#endif
+}
+
+void useInterrupt(boolean v) {
+  if (v) {
+    // Timer0 is already used for millis() - we'll just interrupt somewhere
+    // in the middle and call the "Compare A" function above
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+    usingInterrupt = true;
+  } else {
+    // do not call the interrupt function COMPA anymore
+    TIMSK0 &= ~_BV(OCIE0A);
+    usingInterrupt = false;
+  }
+}
+
 
 /////////////////////////
 /* populateDataPacket */
@@ -192,6 +258,7 @@ void populateDataPacket(struct datapacket* packet) {
   getTemperatureData(packet);
   getBarometerData(packet);
   getGyroscopeData(packet);
+  getGPSData(packet);
 }
 
 // Takes a pointer to the sensor object as a parameter and displays the details.
