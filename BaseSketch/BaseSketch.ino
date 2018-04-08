@@ -202,8 +202,13 @@ void setup() {
     //2 = Bw31_25Cr48Sf512
     //3 = Bw125Cr48Sf4096
     //optional to set own modem configuration values, but must use setModemRegisters(const ModemConfig * config)
-    rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512); // can also use  rh_rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); 
-
+    //rf95.setModemConfig(RH_RF95::Bw31_25Cr48Sf512); // can also use  rh_rf95.setModemConfig(RH_RF95::Bw125Cr48Sf4096); 
+    RH_RF95::ModemConfig custom_config = {
+      0x92, // BW = 500, CR = 4/5
+      0xc4, //SF = 4096 chips/symbol, CRC = enable
+      0x08  // Low date rate = on, AGC = off
+    };
+    rf95.setModemRegisters(&custom_config);
     RADIO_FLAG = true;
   }
   delay(3000);
@@ -570,6 +575,7 @@ void loop() {
     Serial.print(currentPacket.GPS_latitude, 4);
     Serial.print(F(", ")); 
     Serial.println(currentPacket.GPS_longitude, 4);
+    Serial.print(F("GPS Altitude: ")); Serial.println(currentPacket.GPS_altitude, 4);
   
     previousMillis = currentMillis;
     
