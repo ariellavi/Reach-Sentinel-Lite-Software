@@ -13,7 +13,7 @@
 #include <SoftwareSerial.h>
 // If using software serial, keep this line enabled
 // (you can change the pin numbers to match your wiring):
-SoftwareSerial mySerial(3, 2);
+SoftwareSerial mySerial(3, 2); // (RX, TX)
 Adafruit_GPS GPS(&mySerial);
 
 
