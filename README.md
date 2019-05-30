@@ -1,6 +1,11 @@
 # Reach-Sentinel-Lite-Software #
-Written for Bruin Spacecraft Group Reach Project 2017-2018.
-Contains the code for the on-board Arduino that will manage the data from the sensors.
+Written for Project Reach (sponsored by Bruin Spacecraft Group at UCLA) by the Software Team (Edward Chu, Hirday Gupta) in 2017-2018.
+
+The goal of Reach was to create an on-board telemetry system for an amateur rocket. The payload system was called SENTINEL-Lite, named after its parent iteration, SENTINEL-I. SENTINEL-Lite is composed of an Arduino UNO (used as a flight computer), five digital sensors (Altimeter, Accelerometer, Gyroscope, Magnetometer, Temp Sensor), a GPS, and a digital radio (LoRa). Data is stored on-board on an SD card, and also transmitted to a ground station consisting of a receiving Arduino and LoRa.
+
+The sensors communicate with the UNO on a single I2C bus, and the LoRa utilize the SPI bus to connect to the Arduino. The GPS uses the serial (Rx, Tx) line one the UNO.
+
+This repository contains the code for the Arduino that manages data from the sensors.
 
 ## Required Libraries: ##
 * Adafruit_Sensor
