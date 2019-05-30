@@ -5,7 +5,6 @@ The goal of Reach was to create an on-board telemetry system for an amateur rock
 
 The sensors communicate with the UNO on a single I2C bus, and the LoRa utilize the SPI bus to connect to the Arduino. The GPS uses the serial (Rx, Tx) line one the UNO.
 
-This repository contains the code for the Arduino that manages data from the sensors.
 
 ## Required Libraries: ##
 * Adafruit_Sensor
